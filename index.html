@@ -19,38 +19,35 @@
   <audio id="beep" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" preload="auto"></audio>
 
   <script>
-    let reminderInterval = null;
-    let countdownInterval = null;
     const REMINDER_INTERVAL_MINUTES = 2;
-    let secondsRemaining = REMINDER_INTERVAL_MINUTES * 60;
-
+    let targetTime = Date.now() + REMINDER_INTERVAL_MINUTES * 60 * 1000;
+  
     const countdownDisplay = document.getElementById("countdown");
-
+  
     function updateCountdown() {
-      const minutes = Math.floor(secondsRemaining / 60).toString().padStart(2, '0');
-      const seconds = (secondsRemaining % 60).toString().padStart(2, '0');
+      const now = Date.now();
+      const diff = Math.max(0, targetTime - now);
+  
+      const minutes = Math.floor(diff / 60000).toString().padStart(2, '0');
+      const seconds = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
       countdownDisplay.textContent = `Next break in: ${minutes}:${seconds}`;
+  
+      if (diff <= 0) {
+        showNotification("👁️ Time for an eye break!", "Look away from the screen for 20 seconds.");
+        document.getElementById("beep").play().catch(e => console.log("Sound failed", e));
+        targetTime = Date.now() + REMINDER_INTERVAL_MINUTES * 60 * 1000;
+      }
     }
-
-    function startCountdown() {
-      clearInterval(countdownInterval);
-      countdownInterval = setInterval(() => {
-        secondsRemaining--;
-        if (secondsRemaining <= 0) {
-          showNotification("👁️ Time for an eye break!", "Look away from the screen for 20 seconds.");
-          secondsRemaining = REMINDER_INTERVAL_MINUTES * 60; // reset timer
-        }
-        updateCountdown();
-      }, 1000);
-    }
-
+  
+    // Call updateCountdown every second, but it's okay if it's delayed — it's self-correcting
+    setInterval(updateCountdown, 1000);
+  
     function showNotification(title, message) {
       if (Notification.permission === "granted") {
         new Notification(title, { body: message });
-        document.getElementById("beep").play().catch(e => console.log("Sound failed", e));
       }
     }
-
+  
     function testNotification() {
       if (Notification.permission === "granted") {
         showNotification("✅ Test Notification", "This is how your reminder will appear.");
@@ -64,36 +61,10 @@
         });
       }
     }
-
-    function startReminder() {
-      clearInterval(reminderInterval);
-      clearInterval(countdownInterval);
-      secondsRemaining = REMINDER_INTERVAL_MINUTES * 60;
-      updateCountdown();
-      startCountdown();
-      console.log("Reminder started");
-    }
-
-    function pauseReminder() {
-      clearInterval(reminderInterval);
-      clearInterval(countdownInterval);
-      console.log("Reminder paused");
-    }
-
-    function resumeReminder() {
-      startReminder();
-      console.log("Reminder resumed");
-    }
-
-    // Ask permission and start countdown
-    if (Notification.permission === "granted") {
-      startReminder();
-    } else {
-      Notification.requestPermission().then(permission => {
-        if (permission === "granted") {
-          startReminder();
-        }
-      });
+  
+    // Initial permission check
+    if (Notification.permission !== "granted") {
+      Notification.requestPermission();
     }
   </script>
 </body>
