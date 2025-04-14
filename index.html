@@ -3,9 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <title>Eye Break Reminder</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    #countdown { font-size: 1.5rem; margin-top: 10px; }
+    button { margin: 5px; }
+  </style>
 </head>
 <body>
   <h2>👁️ Eye Break Reminder</h2>
+  <div id="countdown">Next break in: --:--</div>
   <button onclick="testNotification()">Test Notification</button>
   <button onclick="pauseReminder()">Pause</button>
   <button onclick="resumeReminder()">Resume</button>
@@ -14,7 +20,29 @@
 
   <script>
     let reminderInterval = null;
+    let countdownInterval = null;
     const REMINDER_INTERVAL_MINUTES = 20;
+    let secondsRemaining = REMINDER_INTERVAL_MINUTES * 60;
+
+    const countdownDisplay = document.getElementById("countdown");
+
+    function updateCountdown() {
+      const minutes = Math.floor(secondsRemaining / 60).toString().padStart(2, '0');
+      const seconds = (secondsRemaining % 60).toString().padStart(2, '0');
+      countdownDisplay.textContent = `Next break in: ${minutes}:${seconds}`;
+    }
+
+    function startCountdown() {
+      clearInterval(countdownInterval);
+      countdownInterval = setInterval(() => {
+        secondsRemaining--;
+        if (secondsRemaining <= 0) {
+          showNotification("👁️ Time for an eye break!", "Look away from the screen for 20 seconds.");
+          secondsRemaining = REMINDER_INTERVAL_MINUTES * 60; // reset timer
+        }
+        updateCountdown();
+      }, 1000);
+    }
 
     function showNotification(title, message) {
       if (Notification.permission === "granted") {
@@ -25,11 +53,11 @@
 
     function testNotification() {
       if (Notification.permission === "granted") {
-        showNotification("👁️ Test Break", "This is how your reminder will appear.");
+        showNotification("✅ Test Notification", "This is how your reminder will appear.");
       } else {
         Notification.requestPermission().then(permission => {
           if (permission === "granted") {
-            showNotification("👁️ Test Break", "This is how your reminder will appear.");
+            showNotification("✅ Test Notification", "This is how your reminder will appear.");
           } else {
             alert("Notification permission was not granted.");
           }
@@ -38,16 +66,17 @@
     }
 
     function startReminder() {
-      // Clear any existing intervals just in case
       clearInterval(reminderInterval);
-      reminderInterval = setInterval(() => {
-        showNotification("👁️ Time for an eye break!", "Look away from the screen for 20 seconds.");
-      }, REMINDER_INTERVAL_MINUTES * 60 * 1000);
+      clearInterval(countdownInterval);
+      secondsRemaining = REMINDER_INTERVAL_MINUTES * 60;
+      updateCountdown();
+      startCountdown();
       console.log("Reminder started");
     }
 
     function pauseReminder() {
       clearInterval(reminderInterval);
+      clearInterval(countdownInterval);
       console.log("Reminder paused");
     }
 
@@ -56,7 +85,7 @@
       console.log("Reminder resumed");
     }
 
-    // Start automatically if permission is already granted
+    // Ask permission and start countdown
     if (Notification.permission === "granted") {
       startReminder();
     } else {
