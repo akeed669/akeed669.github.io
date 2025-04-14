@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Eye Break Reminder</title>
+</head>
+<body>
+  <h1>👁️ Eye Break Reminder</h1>
+  <p>
+    You'll get a notification with a sound every 20 minutes if you're using your PC.<br>
+    You can also test it or pause/resume the reminders.
+  </p>
+
+  <button onclick="testNotification()">🔔 Test Notification</button>
+  <button onclick="togglePause()" id="pauseButton">⏸️ Pause Reminders</button>
+
+  <!-- Hidden audio element -->
+  <audio id="chime" src="https://www.soundjay.com/button/beep-07.wav" preload="auto"></audio>
+
+  <script>
+    let lastActivity = Date.now();
+    let paused = false;
+
+    document.addEventListener("mousemove", () => lastActivity = Date.now());
+    document.addEventListener("keydown", () => lastActivity = Date.now());
+
+    async function requestPermission() {
+      if (Notification.permission !== "granted") {
+        await Notification.requestPermission();
+      }
+    }
+
+    function playSound() {
+      const audio = document.getElementById("chime");
+      audio.currentTime = 0;
+      audio.play().catch(() => {
+        console.warn("Sound playback failed (probably autoplay policy)");
+      });
+    }
+
+    function showNotification(title, message) {
+      new Notification(title, { body: message });
+      playSound();
+    }
+
+    function sendReminder() {
+      const now = Date.now();
+      const inactiveTime = now - lastActivity;
+
+      if (!paused && inactiveTime < 2 * 60 * 1000) {
+        showNotification("👀 Eye Break Time!", "Look 20 feet away for 20 seconds to rest your eyes!");
+      }
+    }
+
+    function testNotification() {
+      if (Notification.permission === "granted") {
+        showNotification("✅ Test Notification", "This is how your reminder will appear!");
+      } else {
+        requestPermission().then(() => {
+          if (Notification.permission === "granted") testNotification();
+          else alert("Notification permission was not granted.");
+        });
+      }
+    }
+
+    function togglePause() {
+      paused = !paused;
+      document.getElementById("pauseButton").textContent = paused ? "▶️ Resume Reminders" : "⏸️ Pause Reminders";
+    }
+
+    requestPermission().then(() => {
+      setInterval(sendReminder, 20 * 60 * 1000); // Every 20 minutes
+    });
+  </script>
+</body>
+</html>
