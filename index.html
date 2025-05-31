@@ -1,14 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <title>Eye Break Reminder</title>
   <style>
-    body { font-family: sans-serif; padding: 20px; }
-    #countdown { font-size: 1.5rem; margin-top: 10px; }
-    button { margin: 5px; }
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+    }
+
+    #countdown {
+      font-size: 1.5rem;
+      margin-top: 10px;
+    }
+
+    button {
+      margin: 5px;
+    }
   </style>
 </head>
+
 <body>
   <h2>👁️ Eye Break Reminder</h2>
   <div id="countdown">Next break in: --:--</div>
@@ -21,33 +33,80 @@
   <script>
     const REMINDER_INTERVAL_MINUTES = 20;
     let targetTime = Date.now() + REMINDER_INTERVAL_MINUTES * 60 * 1000;
-  
+    let lastActiveTime = Date.now();
+    let isPaused = false;
+    let timerInterval;
+
     const countdownDisplay = document.getElementById("countdown");
-  
+
     function updateCountdown() {
+      if (isPaused) {
+        countdownDisplay.textContent = 'Timer Paused';
+        return;
+      }
+
       const now = Date.now();
+      // Adjust target time if system was inactive
+      if (now - lastActiveTime > 2000) { // If more than 2 seconds have passed
+        targetTime += (now - lastActiveTime);
+      }
+      lastActiveTime = now;
+
       const diff = Math.max(0, targetTime - now);
-  
+
       const minutes = Math.floor(diff / 60000).toString().padStart(2, '0');
       const seconds = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
       countdownDisplay.textContent = `Next break in: ${minutes}:${seconds}`;
-  
+
       if (diff <= 0) {
         showNotification("👁️ Time for an eye break!", "Look away from the screen for 20 seconds.");
         document.getElementById("beep").play().catch(e => console.log("Sound failed", e));
         targetTime = Date.now() + REMINDER_INTERVAL_MINUTES * 60 * 1000;
       }
     }
-  
-    // Call updateCountdown every second, but it's okay if it's delayed — it's self-correcting
-    setInterval(updateCountdown, 1000);
-  
+
+    // Handle visibility change (tab hidden/visible, system sleep)
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        isPaused = true;
+      } else {
+        isPaused = false;
+        lastActiveTime = Date.now();
+        targetTime = Date.now() + REMINDER_INTERVAL_MINUTES * 60 * 1000;
+      }
+    });
+
+    // Handle window focus/blur
+    window.addEventListener('focus', () => {
+      isPaused = false;
+      lastActiveTime = Date.now();
+      targetTime = Date.now() + REMINDER_INTERVAL_MINUTES * 60 * 1000;
+    });
+
+    window.addEventListener('blur', () => {
+      isPaused = true;
+    });
+
+    function pauseReminder() {
+      isPaused = true;
+      countdownDisplay.textContent = 'Timer Paused';
+    }
+
+    function resumeReminder() {
+      isPaused = false;
+      lastActiveTime = Date.now();
+      targetTime = Date.now() + REMINDER_INTERVAL_MINUTES * 60 * 1000;
+    }
+
+    // Start the timer
+    timerInterval = setInterval(updateCountdown, 1000);
+
     function showNotification(title, message) {
       if (Notification.permission === "granted") {
         new Notification(title, { body: message });
       }
     }
-  
+
     function testNotification() {
       if (Notification.permission === "granted") {
         showNotification("✅ Test Notification", "This is how your reminder will appear.");
@@ -61,11 +120,12 @@
         });
       }
     }
-  
+
     // Initial permission check
     if (Notification.permission !== "granted") {
       Notification.requestPermission();
     }
   </script>
 </body>
+
 </html>
