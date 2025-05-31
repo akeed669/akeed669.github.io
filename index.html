@@ -1,71 +1,134 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Eye Break Reminder</title>
   <style>
-    body { font-family: sans-serif; padding: 20px; }
-    #countdown { font-size: 1.5rem; margin-top: 10px; }
-    button { margin: 5px; }
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      text-align: center;
+    }
+
+    #countdown {
+      font-size: 1.8rem;
+      margin: 20px 0;
+    }
+
+    button {
+      padding: 10px 20px;
+      margin: 5px;
+      font-size: 1rem;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    #pauseBtn {
+      background-color: #ffcc00;
+    }
+
+    #resumeBtn {
+      background-color: #4CAF50;
+      color: white;
+    }
+
+    #pauseBtn.paused {
+      background-color: #d4af37;
+    }
+
+    #resumeBtn.resumed {
+      background-color: #357a38;
+    }
   </style>
 </head>
+
 <body>
   <h2>👁️ Eye Break Reminder</h2>
   <div id="countdown">Next break in: --:--</div>
-  <button onclick="testNotification()">Test Notification</button>
-  <button onclick="pauseReminder()">Pause</button>
-  <button onclick="resumeReminder()">Resume</button>
+  <button id="pauseBtn" onclick="pauseReminder()">Pause</button>
+  <button id="resumeBtn" onclick="resumeReminder()">Resume</button>
 
   <audio id="beep" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" preload="auto"></audio>
 
   <script>
     const REMINDER_INTERVAL_MINUTES = 20;
-    let targetTime = Date.now() + REMINDER_INTERVAL_MINUTES * 60 * 1000;
-  
     const countdownDisplay = document.getElementById("countdown");
-  
+    const beep = document.getElementById("beep");
+
+    const pauseBtn = document.getElementById("pauseBtn");
+    const resumeBtn = document.getElementById("resumeBtn");
+
+    let interval;
+    let targetTime;
+    let paused = false;
+    let remainingTime = REMINDER_INTERVAL_MINUTES * 60 * 1000;
+
+    function startReminder() {
+      targetTime = Date.now() + remainingTime;
+      if (interval) clearInterval(interval);
+      interval = setInterval(updateCountdown, 1000);
+    }
+
     function updateCountdown() {
       const now = Date.now();
       const diff = Math.max(0, targetTime - now);
-  
+
       const minutes = Math.floor(diff / 60000).toString().padStart(2, '0');
       const seconds = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
       countdownDisplay.textContent = `Next break in: ${minutes}:${seconds}`;
-  
+
       if (diff <= 0) {
         showNotification("👁️ Time for an eye break!", "Look away from the screen for 20 seconds.");
-        document.getElementById("beep").play().catch(e => console.log("Sound failed", e));
-        targetTime = Date.now() + REMINDER_INTERVAL_MINUTES * 60 * 1000;
+        beep.play().catch(e => console.log("Sound failed", e));
+        remainingTime = REMINDER_INTERVAL_MINUTES * 60 * 1000;
+        targetTime = Date.now() + remainingTime;
       }
     }
-  
-    // Call updateCountdown every second, but it's okay if it's delayed — it's self-correcting
-    setInterval(updateCountdown, 1000);
-  
+
+    function pauseReminder() {
+      if (!paused) {
+        remainingTime = targetTime - Date.now();
+        clearInterval(interval);
+        paused = true;
+        pauseBtn.classList.add("paused");
+        resumeBtn.classList.remove("resumed");
+      }
+    }
+
+    function resumeReminder() {
+      if (paused) {
+        targetTime = Date.now() + remainingTime;
+        interval = setInterval(updateCountdown, 1000);
+        paused = false;
+        resumeBtn.classList.add("resumed");
+        pauseBtn.classList.remove("paused");
+      }
+    }
+
+    // Handle tab visibility (detect wake after sleep/hibernate)
+    document.addEventListener("visibilitychange", () => {
+      if (!paused && document.visibilityState === "visible") {
+        remainingTime = targetTime - Date.now();
+        targetTime = Date.now() + remainingTime;
+      }
+    });
+
     function showNotification(title, message) {
       if (Notification.permission === "granted") {
         new Notification(title, { body: message });
       }
     }
-  
-    function testNotification() {
-      if (Notification.permission === "granted") {
-        showNotification("✅ Test Notification", "This is how your reminder will appear.");
-      } else {
-        Notification.requestPermission().then(permission => {
-          if (permission === "granted") {
-            showNotification("✅ Test Notification", "This is how your reminder will appear.");
-          } else {
-            alert("Notification permission was not granted.");
-          }
-        });
-      }
-    }
-  
-    // Initial permission check
+
+    // Request permission on load
     if (Notification.permission !== "granted") {
       Notification.requestPermission();
     }
+
+    // Start initially
+    startReminder();
   </script>
 </body>
+
 </html>
