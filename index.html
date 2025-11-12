@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="UTF-8" />
-  <title>Eye Break Reminder</title>
+  <title>Break Reminders</title>
   <style>
     body {
       font-family: sans-serif;
@@ -11,9 +11,14 @@
       text-align: center;
     }
 
-    #countdown {
-      font-size: 1.8rem;
-      margin: 20px 0;
+    h2 {
+      margin-top: 0;
+    }
+
+    #eyeCountdown,
+    #stretchCountdown {
+      font-size: 1.6rem;
+      margin: 15px 0;
     }
 
     button {
@@ -46,72 +51,100 @@
 
 <body>
   <h2>👁️ Eye Break Reminder</h2>
-  <div id="countdown">Next break in: --:--</div>
-  <button id="pauseBtn" onclick="pauseReminder()">Pause</button>
-  <button id="resumeBtn" onclick="resumeReminder()">Resume</button>
+  <div id="eyeCountdown">Next eye break in: --:--</div>
+
+  <h2>🧍 Stretch Reminder</h2>
+  <div id="stretchCountdown">Next stretch in: --:--</div>
+
+  <button id="pauseBtn" onclick="pauseReminders()">Pause</button>
+  <button id="resumeBtn" onclick="resumeReminders()">Resume</button>
 
   <audio id="beep" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg" preload="auto"></audio>
 
   <script>
-    const REMINDER_INTERVAL_MINUTES = 20;
-    const countdownDisplay = document.getElementById("countdown");
+    // Eye break: every 20 minutes
+    const EYE_INTERVAL_MIN = 20;
+    // Stretch break: every 60 minutes
+    const STRETCH_INTERVAL_MIN = 60;
+
     const beep = document.getElementById("beep");
+    const eyeCountdown = document.getElementById("eyeCountdown");
+    const stretchCountdown = document.getElementById("stretchCountdown");
 
     const pauseBtn = document.getElementById("pauseBtn");
     const resumeBtn = document.getElementById("resumeBtn");
 
-    let interval;
-    let targetTime;
     let paused = false;
-    let remainingTime = REMINDER_INTERVAL_MINUTES * 60 * 1000;
 
-    function startReminder() {
-      targetTime = Date.now() + remainingTime;
-      if (interval) clearInterval(interval);
-      interval = setInterval(updateCountdown, 1000);
+    const timers = {
+      eye: { interval: null, target: null, remaining: EYE_INTERVAL_MIN * 60 * 1000 },
+      stretch: { interval: null, target: null, remaining: STRETCH_INTERVAL_MIN * 60 * 1000 },
+    };
+
+    function startTimers() {
+      startTimer("eye", EYE_INTERVAL_MIN, eyeCountdown, "👁️ Time for an eye break!", "Look away from the screen for 20 seconds.");
+      startTimer("stretch", STRETCH_INTERVAL_MIN, stretchCountdown, "🧍 Time to stretch!", "Get up and move around for a minute!");
     }
 
-    function updateCountdown() {
-      const now = Date.now();
-      const diff = Math.max(0, targetTime - now);
+    function startTimer(name, minutes, display, title, message) {
+      const timer = timers[name];
+      timer.target = Date.now() + timer.remaining;
+      if (timer.interval) clearInterval(timer.interval);
+      timer.interval = setInterval(() => updateCountdown(name, minutes, display, title, message), 1000);
+    }
 
-      const minutes = Math.floor(diff / 60000).toString().padStart(2, '0');
-      const seconds = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
-      countdownDisplay.textContent = `Next break in: ${minutes}:${seconds}`;
+    function updateCountdown(name, minutes, display, title, message) {
+      const timer = timers[name];
+      const now = Date.now();
+      const diff = Math.max(0, timer.target - now);
+
+      const mm = Math.floor(diff / 60000).toString().padStart(2, '0');
+      const ss = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
+      display.textContent = `Next ${name} break in: ${mm}:${ss}`;
 
       if (diff <= 0) {
-        showNotification("👁️ Time for an eye break!", "Look away from the screen for 20 seconds.");
+        showNotification(title, message);
         beep.play().catch(e => console.log("Sound failed", e));
-        remainingTime = REMINDER_INTERVAL_MINUTES * 60 * 1000;
-        targetTime = Date.now() + remainingTime;
+        timer.remaining = minutes * 60 * 1000;
+        timer.target = Date.now() + timer.remaining;
       }
     }
 
-    function pauseReminder() {
-      if (!paused) {
-        remainingTime = targetTime - Date.now();
-        clearInterval(interval);
-        paused = true;
-        pauseBtn.classList.add("paused");
-        resumeBtn.classList.remove("resumed");
+    function pauseReminders() {
+      if (paused) return;
+      for (const key in timers) {
+        const t = timers[key];
+        t.remaining = t.target - Date.now();
+        clearInterval(t.interval);
       }
+      paused = true;
+      pauseBtn.classList.add("paused");
+      resumeBtn.classList.remove("resumed");
     }
 
-    function resumeReminder() {
-      if (paused) {
-        targetTime = Date.now() + remainingTime;
-        interval = setInterval(updateCountdown, 1000);
-        paused = false;
-        resumeBtn.classList.add("resumed");
-        pauseBtn.classList.remove("paused");
+    function resumeReminders() {
+      if (!paused) return;
+      for (const key in timers) {
+        const t = timers[key];
+        t.target = Date.now() + t.remaining;
+        t.interval = setInterval(() => {
+          const { interval, target, remaining } = t;
+        }, 1000);
       }
+      startTimers(); // restart countdowns cleanly
+      paused = false;
+      resumeBtn.classList.add("resumed");
+      pauseBtn.classList.remove("paused");
     }
 
-    // Handle tab visibility (detect wake after sleep/hibernate)
+    // Handle tab visibility
     document.addEventListener("visibilitychange", () => {
       if (!paused && document.visibilityState === "visible") {
-        remainingTime = targetTime - Date.now();
-        targetTime = Date.now() + remainingTime;
+        for (const key in timers) {
+          const t = timers[key];
+          t.remaining = t.target - Date.now();
+          t.target = Date.now() + t.remaining;
+        }
       }
     });
 
@@ -121,13 +154,11 @@
       }
     }
 
-    // Request permission on load
     if (Notification.permission !== "granted") {
       Notification.requestPermission();
     }
 
-    // Start initially
-    startReminder();
+    startTimers();
   </script>
 </body>
 
